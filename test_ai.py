@@ -1,7 +1,7 @@
 from openai import OpenAI
 from datetime import datetime
 import json
-
+#testar en liten ändrig för att testa git.
 
 
 while True:
