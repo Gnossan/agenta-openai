@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 import requests
 import json
 import os
+import threading
+import logging
+import sys
 from openai import OpenAI
 
 load_dotenv()
@@ -69,6 +72,17 @@ TOOLS = [
         }
     }
 ]
+# Loggning
+logging.basicConfig(
+    filename="ha_reader.log",
+    level=logging.ERROR,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    logging.error("Okantad krasch", exc_info=(exc_type, exc_value, exc_traceback))
+
+sys.excepthook = handle_exception
 # ─────────────────────────────────────────
 # HA-funktioner
 # ─────────────────────────────────────────
@@ -133,7 +147,7 @@ def ask_ai(user_message, user_history=[]):
     device_info = json.dumps(devices, ensure_ascii=False, indent=2)
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5.4-mini",
         messages=[
             {
                 "role": "system",
@@ -202,13 +216,81 @@ def webhook():
     print(f"Svar: {answer}")
 
     return answer, 200
+@app.route("/")
+def index():
+    return """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hemassistent</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 0 20px; }
+        #chat { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
+        .user { text-align: right; color: #0066cc; margin: 5px 0; }
+        .ai { text-align: left; color: #333; margin: 5px 0; }
+        input { width: 80%; padding: 8px; }
+        button { width: 18%; padding: 8px; }
+    </style>
+</head>
+<body>
+    <h2>Hemassistent</h2>
+    <div id="chat"></div>
+    <input type="text" id="msg" placeholder="Skriv något..." />
+    <button onclick="send()">Skicka</button>
+    <script>
+        async function send() {
+            const msg = document.getElementById("msg").value;
+            if (!msg) return;
+            document.getElementById("chat").innerHTML += '<p class="user">' + msg + '</p>';
+            document.getElementById("msg").value = "";
+            const res = await fetch("/chat", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({message: msg})
+            });
+            const data = await res.json();
+            document.getElementById("chat").innerHTML += '<p class="ai">' + data.reply + '</p>';
+            document.getElementById("chat").scrollTop = document.getElementById("chat").scrollHeight;
+        }
+        document.getElementById("msg").addEventListener("keypress", function(e) {
+            if (e.key === "Enter") send();
+        });
+    </script>
+</body>
+</html>
+"""
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.get_json()
+    user_message = data.get("message", "")
+    answer = ask_ai(user_message, conversation_history)
+    conversation_history.append({"role": "user", "content": user_message})
+    conversation_history.append({"role": "assistant", "content": answer})
+    return {"reply": answer}
 
 # ─────────────────────────────────────────
 # Start
 # ─────────────────────────────────────────
-#if __name__ == "__main__":
-    #save_device_context()
-   # app.run(host="0.0.0.0", port=5001)
+if __name__ == "__main__":
+    save_device_context()
+    conversation_history = []
+
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
+    
+    flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5001, use_reloader=False, use_debugger=False))
+    flask_thread.daemon = True
+    flask_thread.start()
+    
+    while True:
+        user_input = input("Du: ")
+        if user_input.lower() in ["exit", "quit", "arrêt"]:
+            break
+        conversation_history.append({"role": "user", "content": user_input})
+        answer = ask_ai(user_input, conversation_history)
+        conversation_history.append({"role": "assistant", "content": answer})
+        print("AI:", answer, "\n")
 
 # ─────────────────────────────────────────
 # Chat-prompt
