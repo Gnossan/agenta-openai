@@ -9,7 +9,7 @@ import os
 import threading
 import logging
 import sys
-from openai import OpenAI
+import anthropic
 
 load_dotenv()
 
@@ -18,9 +18,19 @@ app = Flask(__name__)
 # ─────────────────────────────────────────
 # Konfiguration
 # ─────────────────────────────────────────
-SECRET   = os.getenv("SECRET")
-HA_URL   = os.getenv("HA_URL")
-HA_TOKEN = os.getenv("HA_TOKEN")
+OPTIONS_FILE = "/data/options.json"
+if os.path.exists(OPTIONS_FILE):
+    with open(OPTIONS_FILE) as f:
+        options = json.load(f)
+    SECRET = options.get("secret")
+    HA_URL = options.get("ha_url")
+    HA_TOKEN = options.get("ha_token")
+    os.environ["ANTHROPIC_API_KEY"] = options.get("anthropic_api_key", "")
+else:
+    load_dotenv()
+    SECRET = os.getenv("SECRET")
+    HA_URL = os.getenv("HA_URL")
+    HA_TOKEN = os.getenv("HA_TOKEN")
 
 HA_HEADERS = {
     "Authorization": f"Bearer {HA_TOKEN}",
@@ -29,46 +39,52 @@ HA_HEADERS = {
 
 DEVICES_FILE = "devices.json"
 
-client = OpenAI()
-
+client = anthropic.Anthropic()
 TOOLS = [
     {
-        "type": "function",
-        "function": {
-            "name": "get_device_state",
-            "description": "Hämtar aktuell status för en enhet i hemmet.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "entity_id": {
-                        "type": "string",
-                        "description": "Enhetens entity_id, t.ex. light.golvlampa_i_kontoret"
-                    }
-                },
-                "required": ["entity_id"]
-            }
+        "name": "get_device_state",
+        "description": "Hämtar aktuell status för en enhet i hemmet.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "entity_id": {
+                    "type": "string",
+                    "description": "Enhetens entity_id, t.ex. light.golvlampa_i_kontoret"
+                }
+            },
+            "required": ["entity_id"]
         }
     },
     {
-        "type": "function",
-        "function": {
-            "name": "set_device_state",
-            "description": "Tänder eller släcker en enhet i hemmet.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "entity_id": {
-                        "type": "string",
-                        "description": "Enhetens entity_id, t.ex. light.golvlampa_i_kontoret"
-                    },
-                    "state": {
-                        "type": "string",
-                        "enum": ["on", "off"],
-                        "description": "Önskat tillstånd, on eller off"
-                    }
+        "name": "set_device_state",
+        "description": "Tänder eller släcker en enhet i hemmet.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "entity_id": {
+                    "type": "string",
+                    "description": "Enhetens entity_id, t.ex. light.golvlampa_i_kontoret"
                 },
-                "required": ["entity_id", "state"]
-            }
+                "state": {
+                    "type": "string",
+                    "enum": ["on", "off"],
+                    "description": "Önskat tillstånd, on eller off"
+                },
+                "brightness": {
+                    "type": "integer",
+                    "description": "Ljusstyrka mellan 0 och 255, används bara när state är on"
+                },
+                "color_temp": {
+                    "type": "integer",
+                    "description": "Färgtemperatur i Kelvin. Varmt ljus ca 2700K, neutralt ca 4000K, kallt ca 6000K."
+                },
+                "rgb_color": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "RGB-färg som en lista med tre värden [röd, grön, blå], varje värde mellan 0 och 255. T.ex. [255, 0, 0] för röd."
+                }
+            },
+            "required": ["entity_id", "state"]
         }
     }
 ]
@@ -129,16 +145,22 @@ def load_device_context():
     with open(DEVICES_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
     
-def set_device_state(entity_id, state):
+def set_device_state(entity_id, state, brightness=None, color_temp=None, rgb_color=None):
     domain = entity_id.split(".")[0]
     service = "turn_on" if state == "on" else "turn_off"
+    payload = {"entity_id": entity_id}
+    if brightness is not None:
+        payload["brightness"] = brightness
+    if color_temp is not None:
+        payload["color_temp_kelvin"] = color_temp
+    if rgb_color is not None:
+        payload["rgb_color"] = rgb_color
     r = requests.post(
         f"{HA_URL}/api/services/{domain}/{service}",
         headers=HA_HEADERS,
-        json={"entity_id": entity_id}
+        json=payload
     )
     return "ok" if r.status_code == 200 else "fel"
-
 # ─────────────────────────────────────────
 # AI-funktioner
 # ─────────────────────────────────────────
@@ -146,59 +168,61 @@ def ask_ai(user_message, user_history=[]):
     devices = load_device_context()
     device_info = json.dumps(devices, ensure_ascii=False, indent=2)
 
-    response = client.chat.completions.create(
-        model="gpt-5.4-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Du är en hemassistent som känner till följande enheter:\n\n"
-                    f"{device_info}\n\n"
-                    "Du är en hemassistent som kan hämta status och styra enheter i hemmet. "
-                    "När användaren ber dig tända eller släcka en enhet, använd set_device_state direkt utan att fråga om bekräftelse."
-                )
-            },
-            *user_history,
-            {"role": "user", "content": user_message}
-        ],
+    system_prompt = (
+        "Du är en hemassistent som känner till följande enheter:\n\n"
+        f"{device_info}\n\n"
+        "Du kan hämta status och styra enheter i hemmet. "
+        "Du kan tända, släcka, dimma, ändra färgtemperatur och RGB-färg på lampor. "
+        "Använd verktygen för att utföra det användaren ber om. "
+        "Använd verktygen direkt utan att be om bekräftelse."
+    )
+
+    messages = list(user_history) + [{"role": "user", "content": user_message}]
+
+    response = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=1024,
+        system=system_prompt,
         tools=TOOLS,
-        temperature=0.5
+        messages=messages
     )
 
-    message = response.choices[0].message
-
-    if message.tool_calls:
+    # Kolla om Claude vill använda ett verktyg
+    if response.stop_reason == "tool_use":
         tool_results = []
-        for tool_call in message.tool_calls:
-            #print(f"Verktyg: {tool_call.function.name}, args: {tool_call.function.arguments}")
-            arguments = json.loads(tool_call.function.arguments)
-        
-            if tool_call.function.name == "get_device_state":
-                result = get_device_state(arguments["entity_id"])
-            elif tool_call.function.name == "set_device_state":
-                result = set_device_state(arguments["entity_id"], arguments["state"])
-            else:
-                result = "okänt verktyg"
-        
-            tool_results.append({
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": str(result)
-            #print(f"tool_results längd: {len(tool_results)}")
-        })
+        for block in response.content:
+            if block.type == "tool_use":
+                arguments = block.input
+                if block.name == "get_device_state":
+                    result = get_device_state(arguments["entity_id"])
+                elif block.name == "set_device_state":
+                    brightness = arguments.get("brightness", None)
+                    color_temp = arguments.get("color_temp", None)
+                    rgb_color = arguments.get("rgb_color", None)
+                    result = set_device_state(arguments["entity_id"], arguments["state"], brightness, color_temp, rgb_color)
+                else:
+                    result = "okänt verktyg"
 
-        second_response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                *user_history,
-                {"role": "user", "content": user_message},
-                message,
-                *tool_results
-        ]
-    )
-        return second_response.choices[0].message.content.strip()
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": str(result)
+                })
 
-    return message.content.strip()
+        # Skicka tillbaka resultaten till Claude
+        second_response = client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=1024,
+            system=system_prompt,
+            tools=TOOLS,
+            messages=messages + [
+                {"role": "assistant", "content": response.content},
+                {"role": "user", "content": tool_results}
+            ]
+        )
+        return second_response.content[0].text
+
+    return response.content[0].text
 # ─────────────────────────────────────────
 # Flask-routes
 # ─────────────────────────────────────────
@@ -276,33 +300,24 @@ def chat():
 if __name__ == "__main__":
     save_device_context()
     conversation_history = []
-
-    logging.getLogger('werkzeug').setLevel(logging.ERROR)
     
-    flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5001, use_reloader=False, use_debugger=False))
-    flask_thread.daemon = True
-    flask_thread.start()
+    in_container = os.path.exists("/data/options.json")
     
-    while True:
-        user_input = input("Du: ")
-        if user_input.lower() in ["exit", "quit", "arrêt"]:
-            break
-        conversation_history.append({"role": "user", "content": user_input})
-        answer = ask_ai(user_input, conversation_history)
-        conversation_history.append({"role": "assistant", "content": answer})
-        print("AI:", answer, "\n")
-
-# ─────────────────────────────────────────
-# Chat-prompt
-# ─────────────────────────────────────────    
-if __name__ == "__main__":
-    save_device_context()
-    conversation_history = []
-    while True:
-        user_input = input("Du: ")
-        if user_input.lower() in ["exit", "quit"]:
-            break
-        conversation_history.append({"role": "user", "content": user_input})
-        answer = ask_ai(user_input, conversation_history)
-        conversation_history.append({"role": "assistant", "content": answer})
-        print(f"AI: {answer}\n")
+    if in_container:
+        # I HAOS — kör bara Flask
+        app.run(host="0.0.0.0", port=5001)
+    else:
+        # Lokalt — kör Flask i tråd + chattloop
+        logging.getLogger('werkzeug').setLevel(logging.ERROR)
+        flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5001, use_reloader=False, use_debugger=False))
+        flask_thread.daemon = True
+        flask_thread.start()
+        
+        while True:
+            user_input = input("Du: ")
+            if user_input.lower() in ["exit", "quit"]:
+                break
+            conversation_history.append({"role": "user", "content": user_input})
+            answer = ask_ai(user_input, conversation_history)
+            conversation_history.append({"role": "assistant", "content": answer})
+            print("AI:", answer, "\n")

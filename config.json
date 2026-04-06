@@ -1,0 +1,28 @@
+{
+  "name": "Home AI",
+  "version": "0.1.0",
+  "slug": "homeai",
+  "description": "AI-assisterad hemautomation",
+  "arch": ["aarch64", "amd64", "armv7"],
+  "startup": "application",
+  "boot": "auto",
+  "ingress": false,
+  "options": {
+    "secret": "",
+    "ha_url": "",
+    "ha_token": "",
+    "anthropic_api_key": ""
+  },
+  "schema": {
+    "secret": "str",
+    "ha_url": "str",
+    "ha_token": "str",
+    "anthropic_api_key": "str"
+  },
+  "ports": {
+    "5001/tcp": 5001
+  },
+  "ports_description": {
+    "5001/tcp": "Web interface"
+  }
+}
