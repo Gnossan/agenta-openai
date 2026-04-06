@@ -38,6 +38,7 @@ HA_HEADERS = {
 }
 
 DEVICES_FILE = "devices.json"
+conversation_history = []
 
 client = anthropic.Anthropic()
 TOOLS = [
@@ -269,7 +270,7 @@ def index():
             if (!msg) return;
             document.getElementById("chat").innerHTML += '<p class="user">' + msg + '</p>';
             document.getElementById("msg").value = "";
-            const res = await fetch("/chat", {
+            const res = await fetch("chat", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({message: msg})
@@ -286,13 +287,20 @@ def index():
 </html>
 """
 @app.route("/chat", methods=["POST"])
+@app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
     user_message = data.get("message", "")
-    answer = ask_ai(user_message, conversation_history)
-    conversation_history.append({"role": "user", "content": user_message})
-    conversation_history.append({"role": "assistant", "content": answer})
-    return {"reply": answer}
+    logging.error(f"Chat anrop: {user_message}")
+    try:
+        answer = ask_ai(user_message, conversation_history)
+        conversation_history.append({"role": "user", "content": user_message})
+        conversation_history.append({"role": "assistant", "content": answer})
+        logging.error(f"Svar: {answer}")
+        return {"reply": answer}
+    except Exception as e:
+        logging.error(f"Fel i chat: {e}")
+        return {"reply": "Ett fel uppstod"}, 500
 
 # ─────────────────────────────────────────
 # Start
@@ -305,7 +313,7 @@ if __name__ == "__main__":
     
     if in_container:
         # I HAOS — kör bara Flask
-        app.run(host="0.0.0.0", port=5001)
+        app.run(host="0.0.0.0", port=5001, debug=False)
     else:
         # Lokalt — kör Flask i tråd + chattloop
         logging.getLogger('werkzeug').setLevel(logging.ERROR)
