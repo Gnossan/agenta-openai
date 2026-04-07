@@ -311,7 +311,7 @@ def chat():
         session_history.append({"role": "assistant", "content": answer})
         return {"reply": answer}
     except Exception as e:
-      logging.error(f"Fel i chat: {e}", exc_info=True)
+      print(f"Fel i chat: {e}", flush=True)
       return {"reply": "Ett fel uppstod"}, 500
 # ─────────────────────────────────────────
 # Start
