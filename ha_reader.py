@@ -310,7 +310,9 @@ def chat():
         if session_id not in sessions:
             sessions[session_id] = []
         session_history = sessions[session_id]
+        print("Anropar ask_ai...", flush=True)
         answer = ask_ai(user_message, session_history)
+        print(f"Svar från ask_ai: {answer}", flush=True)
         session_history.append({"role": "user", "content": user_message})
         session_history.append({"role": "assistant", "content": answer})
         return {"reply": answer}
