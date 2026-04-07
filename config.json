@@ -1,6 +1,6 @@
 {
   "name": "Home AI",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "slug": "homeai-openai",
   "description": "AI-assisterad hemautomation",
   "arch": ["aarch64", "amd64", "armv7"],
@@ -24,9 +24,9 @@
     "openai_api_key": "str"
   },
   "ports": {
-    "5001/tcp": 5001
+    "5001/tcp": 5002
   },
   "ports_description": {
-    "5001/tcp": "Web interface"
+    "5002/tcp": "Web interface"
   }
 }
