@@ -315,7 +315,7 @@ def chat():
         session_history.append({"role": "assistant", "content": answer})
         return {"reply": answer}
     except Exception as e:
-      return {"reply": f"FEL: {str(e)}"}, 500
+      return {"reply": f"FELFEL: {str(e)}"}, 500
 # ─────────────────────────────────────────
 # Start
 # ─────────────────────────────────────────
