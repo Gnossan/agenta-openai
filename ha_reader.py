@@ -315,9 +315,9 @@ def chat():
         session_history.append({"role": "assistant", "content": answer})
         return {"reply": answer}
     except Exception as e:
-      print(f"FEL: {e}", flush=True)
-      print(f"FEL typ: {type(e)}", flush=True)
-      return {"reply": "Ett fel uppstod"}, 500
+      #print(f"FEL: {e}", flush=True)
+      #print(f"FEL typ: {type(e)}", flush=True)
+     return {"reply": str(e)}, 500
 # ─────────────────────────────────────────
 # Start
 # ─────────────────────────────────────────
