@@ -24,7 +24,7 @@
     "openai_api_key": "str"
   },
   "ports": {
-    "5001/tcp": 5002
+    "5002/tcp": 5002
   },
   "ports_description": {
     "5002/tcp": "Web interface"
