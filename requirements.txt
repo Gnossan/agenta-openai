@@ -1,4 +1,4 @@
 flask
 requests
-anthropic
+openai
 python-dotenv
