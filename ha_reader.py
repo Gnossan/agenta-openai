@@ -26,7 +26,7 @@ if os.path.exists(OPTIONS_FILE):
     SECRET = options.get("secret")
     HA_URL = options.get("ha_url")
     HA_TOKEN = options.get("ha_token")
-    os.environ["ANTHROPIC_API_KEY"] = options.get("anthropic_api_key", "")
+    os.environ["OPENAI_API_KEY"] = options.get("openai_api_key", "")
 else:
     load_dotenv()
     SECRET = os.getenv("SECRET")
