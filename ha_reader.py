@@ -267,12 +267,12 @@ def index():
         #chat { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
         .user { text-align: right; color: #0066cc; margin: 5px 0; }
         .ai { text-align: left; color: #333; margin: 5px 0; }
-        input { width: 80%; padding: 8px; }
+        input { width: 80%; padding: 8px; font-size: 16px; }
         button { width: 18%; padding: 8px; }
     </style>
 </head>
 <body>
-    <h2>Hemassistent</h2>
+    <h2>Hemassistent - OpenAI</h2>
     <div id="chat"></div>
     <input type="text" id="msg" placeholder="Skriv något..." />
     <button onclick="send()">Skicka</button>
