@@ -264,7 +264,7 @@ def index():
     <title>Hemassistent</title>
     <style>
         body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 0 20px; }
-        #chat { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
+        #chat { border: 1px solid #ccc; height: 100px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
         .user { text-align: right; color: #0066cc; margin: 5px 0; }
         .ai { text-align: left; color: #333; margin: 5px 0; }
         input { width: 80%; padding: 8px; font-size: 16px; }
