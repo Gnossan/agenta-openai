@@ -302,6 +302,7 @@ def index():
 """
 @app.route("/chat", methods=["POST"])
 def chat():
+    print("Chat route reached!", flush=True)
     data = request.get_json()
     user_message = data.get("message", "")
     session_id = data.get("session_id", "default")
