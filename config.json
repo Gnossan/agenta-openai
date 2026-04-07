@@ -15,13 +15,15 @@
     "secret": "",
     "ha_url": "",
     "ha_token": "",
-    "anthropic_api_key": ""
+    "openai_api_key": ""
+    "model": "gpt-5.4-mini"
   },
   "schema": {
     "secret": "str",
     "ha_url": "str",
     "ha_token": "str",
-    "anthropic_api_key": "str"
+    "openai_api_key": "str"
+    "model": "str"
   },
   "ports": {
     "5001/tcp": 5001
