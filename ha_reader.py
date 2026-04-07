@@ -315,7 +315,8 @@ def chat():
         session_history.append({"role": "assistant", "content": answer})
         return {"reply": answer}
     except Exception as e:
-      print(f"Fel i chat: {e}", flush=True)
+      print(f"FEL: {e}", flush=True)
+      print(f"FEL typ: {type(e)}", flush=True)
       return {"reply": "Ett fel uppstod"}, 500
 # ─────────────────────────────────────────
 # Start
@@ -323,7 +324,7 @@ def chat():
 if __name__ == "__main__":
     save_device_context()
     conversation_history = []
-    #sessions = {}
+    sessions = {}
     
     in_container = os.path.exists("/data/options.json")
     
