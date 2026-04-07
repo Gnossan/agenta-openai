@@ -323,7 +323,7 @@ def chat():
 if __name__ == "__main__":
     save_device_context()
     conversation_history = []
-    sessions = {}
+    #sessions = {}
     
     in_container = os.path.exists("/data/options.json")
     
