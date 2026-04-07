@@ -9,7 +9,7 @@ import os
 import threading
 import logging
 import sys
-import anthropic
+from openai import OpenAI
 
 load_dotenv()
 
@@ -18,6 +18,7 @@ app = Flask(__name__)
 # ─────────────────────────────────────────
 # Konfiguration
 # ─────────────────────────────────────────
+MODEL = os.getenv("MODEL", "gpt-5.4-mini")
 OPTIONS_FILE = "/data/options.json"
 if os.path.exists(OPTIONS_FILE):
     with open(OPTIONS_FILE) as f:
@@ -39,53 +40,60 @@ HA_HEADERS = {
 
 DEVICES_FILE = "devices.json"
 conversation_history = []
+sessions = {}
 
-client = anthropic.Anthropic()
+client = OpenAI()
 TOOLS = [
     {
-        "name": "get_device_state",
-        "description": "Hämtar aktuell status för en enhet i hemmet.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "entity_id": {
-                    "type": "string",
-                    "description": "Enhetens entity_id, t.ex. light.golvlampa_i_kontoret"
-                }
-            },
-            "required": ["entity_id"]
+        "type": "function",
+        "function": {
+            "name": "get_device_state",
+            "description": "Hämtar aktuell status för en enhet i hemmet.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_id": {
+                        "type": "string",
+                        "description": "Enhetens entity_id, t.ex. light.golvlampa_i_kontoret"
+                    }
+                },
+                "required": ["entity_id"]
+            }
         }
     },
     {
-        "name": "set_device_state",
-        "description": "Tänder eller släcker en enhet i hemmet.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "entity_id": {
-                    "type": "string",
-                    "description": "Enhetens entity_id, t.ex. light.golvlampa_i_kontoret"
+        "type": "function",
+        "function": {
+            "name": "set_device_state",
+            "description": "Tänder eller släcker en enhet i hemmet.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_id": {
+                        "type": "string",
+                        "description": "Enhetens entity_id, t.ex. light.golvlampa_i_kontoret"
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": ["on", "off"],
+                        "description": "Önskat tillstånd, on eller off"
+                    },
+                    "brightness": {
+                        "type": "integer",
+                        "description": "Ljusstyrka mellan 0 och 255, används bara när state är on"
+                    },
+                    "color_temp": {
+                        "type": "integer",
+                        "description": "Färgtemperatur i Kelvin. Varmt ljus ca 2700K, neutralt ca 4000K, kallt ca 6000K."
+                    },
+                    "rgb_color": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "RGB-färg som en lista med tre värden [röd, grön, blå], varje värde mellan 0 och 255. T.ex. [255, 0, 0] för röd."
+                    }
                 },
-                "state": {
-                    "type": "string",
-                    "enum": ["on", "off"],
-                    "description": "Önskat tillstånd, on eller off"
-                },
-                "brightness": {
-                    "type": "integer",
-                    "description": "Ljusstyrka mellan 0 och 255, används bara när state är on"
-                },
-                "color_temp": {
-                    "type": "integer",
-                    "description": "Färgtemperatur i Kelvin. Varmt ljus ca 2700K, neutralt ca 4000K, kallt ca 6000K."
-                },
-                "rgb_color": {
-                    "type": "array",
-                    "items": {"type": "integer"},
-                    "description": "RGB-färg som en lista med tre värden [röd, grön, blå], varje värde mellan 0 och 255. T.ex. [255, 0, 0] för röd."
-                }
-            },
-            "required": ["entity_id", "state"]
+                "required": ["entity_id", "state"]
+            }
         }
     }
 ]
@@ -169,61 +177,62 @@ def ask_ai(user_message, user_history=[]):
     devices = load_device_context()
     device_info = json.dumps(devices, ensure_ascii=False, indent=2)
 
-    system_prompt = (
-        "Du är en hemassistent som känner till följande enheter:\n\n"
-        f"{device_info}\n\n"
-        "Du kan hämta status och styra enheter i hemmet. "
-        "Du kan tända, släcka, dimma, ändra färgtemperatur och RGB-färg på lampor. "
-        "Använd verktygen för att utföra det användaren ber om. "
-        "Använd verktygen direkt utan att be om bekräftelse."
-    )
-
-    messages = list(user_history) + [{"role": "user", "content": user_message}]
-
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
-        system=system_prompt,
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Du är en hemassistent som känner till följande enheter:\n\n"
+                    f"{device_info}\n\n"
+                    "Du kan hämta status och styra enheter i hemmet. "
+                    "Du kan tända, släcka, dimma, ändra färgtemperatur och RGB-färg på lampor. "
+                    "Använd verktygen för att utföra det användaren ber om. "
+                    "Använd verktygen direkt utan att be om bekräftelse."
+                )
+            },
+            *user_history,
+            {"role": "user", "content": user_message}
+        ],
         tools=TOOLS,
-        messages=messages
+        temperature=0.5
     )
 
-    # Kolla om Claude vill använda ett verktyg
-    if response.stop_reason == "tool_use":
+    message = response.choices[0].message
+
+    if message.tool_calls:
         tool_results = []
-        for block in response.content:
-            if block.type == "tool_use":
-                arguments = block.input
-                if block.name == "get_device_state":
-                    result = get_device_state(arguments["entity_id"])
-                elif block.name == "set_device_state":
-                    brightness = arguments.get("brightness", None)
-                    color_temp = arguments.get("color_temp", None)
-                    rgb_color = arguments.get("rgb_color", None)
-                    result = set_device_state(arguments["entity_id"], arguments["state"], brightness, color_temp, rgb_color)
-                else:
-                    result = "okänt verktyg"
+        for tool_call in message.tool_calls:
+            arguments = json.loads(tool_call.function.arguments)
 
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": str(result)
-                })
+            if tool_call.function.name == "get_device_state":
+                result = get_device_state(arguments["entity_id"])
+            elif tool_call.function.name == "set_device_state":
+                brightness = arguments.get("brightness", None)
+                color_temp = arguments.get("color_temp", None)
+                rgb_color = arguments.get("rgb_color", None)
+                result = set_device_state(arguments["entity_id"], arguments["state"], brightness, color_temp, rgb_color)
+            else:
+                result = "okänt verktyg"
 
-        # Skicka tillbaka resultaten till Claude
-        second_response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            system=system_prompt,
-            tools=TOOLS,
-            messages=messages + [
-                {"role": "assistant", "content": response.content},
-                {"role": "user", "content": tool_results}
+            tool_results.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": str(result)
+            })
+
+        second_response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                *user_history,
+                {"role": "user", "content": user_message},
+                message,
+                *tool_results
             ]
         )
-        return second_response.content[0].text
+        return second_response.choices[0].message.content.strip()
 
-    return response.content[0].text
+    return message.content.strip()
 # ─────────────────────────────────────────
 # Flask-routes
 # ─────────────────────────────────────────
