@@ -236,6 +236,9 @@ def ask_ai(user_message, user_history=[]):
 # ─────────────────────────────────────────
 # Flask-routes
 # ─────────────────────────────────────────
+@app.route("/test")
+def test():
+    return {"status": "ok"}
 @app.route("/webhook", methods=["POST"])
 def webhook():
     token = request.headers.get("X-Webhook-Token")
