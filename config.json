@@ -1,6 +1,6 @@
 {
-  "name": "Home AI",
-  "version": "0.3.62",
+  "name": "Home AI-OpenAI-dev",
+  "version": "dev.3.65",
   "slug": "homeai-openai",
   "description": "AI-assisterad hemautomation",
   "arch": ["aarch64", "amd64", "armv7"],
