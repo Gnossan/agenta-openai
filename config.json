@@ -1,13 +1,13 @@
 {
   "name": "Home AI-OpenAI-dev",
-  "version": "dev.3.63",
+  "version": "dev.3.63".1,
   "slug": "homeai-openai",
   "description": "AI-assisterad hemautomation",
   "arch": ["aarch64", "amd64", "armv7"],
   "startup": "application",
   "boot": "auto",
   "ingress": true,
-  "ingress_port": 5002,
+  "ingress_port": 5003,
   "ingress_entry": "/",
   "panel_icon": "mdi:home-assistant",
   "panel_title": "Home AI",
@@ -24,7 +24,7 @@
     "openai_api_key": "str"
   },
   "ports": {
-    "5002/tcp": 5002
+    "5002/tcp": 5003
   },
   "ports_description": {
     "5002/tcp": "Web interface"
