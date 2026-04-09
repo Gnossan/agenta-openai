@@ -208,6 +208,25 @@ def set_device_state(entity_id, state, brightness=None, color_temp=None, rgb_col
         json=payload
     )
     return "ok" if r.status_code == 200 else "fel"
+
+MEMORY_FILE = "/data/memory.json"
+
+def load_memory():
+    if not os.path.exists(MEMORY_FILE):
+        return {}
+    with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_memory(key, value):
+    memory = load_memory()
+    memory[key] = value
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(memory, f, indent=2, ensure_ascii=False)
+    return "ok"
+
+def get_memory(key):
+    memory = load_memory()
+    return memory.get(key, "ingen information hittades")
 # ─────────────────────────────────────────
 # AI-funktioner
 # ─────────────────────────────────────────
