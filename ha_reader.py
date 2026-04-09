@@ -95,6 +95,44 @@ TOOLS = [
                 "required": ["entity_id", "state"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_memory",
+            "description": "Sparar information som användaren explicit bett om att komma ihåg.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "En kort beskrivande nyckel, t.ex. 'sovrum_placering'"
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "Informationen som ska sparas"
+                    }
+                },
+                "required": ["key", "value"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_memory",
+            "description": "Hämtar sparad information när användaren antyder att agenten borde känna till något.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "Nyckeln för informationen som ska hämtas"
+                    }
+                },
+                "required": ["key"]
+            }
+        }
     }
 ]
 # Loggning
@@ -189,6 +227,8 @@ def ask_ai(user_message, user_history=[]):
                     "Du kan tända, släcka, dimma, ändra färgtemperatur och RGB-färg på lampor. "
                     "Använd verktygen för att utföra det användaren ber om. "
                     "Använd verktygen direkt utan att be om bekräftelse."
+                    "Använd save_memory när användaren explicit ber dig komma ihåg något. "
+                    "Använd get_memory när användaren antyder att du borde känna till något."
                 )
             },
             *user_history,
@@ -212,6 +252,10 @@ def ask_ai(user_message, user_history=[]):
                 color_temp = arguments.get("color_temp", None)
                 rgb_color = arguments.get("rgb_color", None)
                 result = set_device_state(arguments["entity_id"], arguments["state"], brightness, color_temp, rgb_color)
+            elif tool_call.function.name == "save_memory":
+                result = save_memory(arguments["key"], arguments["value"])
+            elif tool_call.function.name == "get_memory":
+                result = get_memory(arguments["key"])
             else:
                 result = "okänt verktyg"
 
