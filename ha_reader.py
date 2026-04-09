@@ -212,7 +212,7 @@ def set_device_state(entity_id, state, brightness=None, color_temp=None, rgb_col
     )
     return "ok" if r.status_code == 200 else "fel"
 
-MEMORY_FILE = "/data/memory.json"
+MEMORY_FILE = "/share/memory.json"
 
 def load_memory():
     print(f"{current_time}--MEMORY_FILE sökväg: {MEMORY_FILE}", flush=True)
