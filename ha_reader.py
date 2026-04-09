@@ -212,7 +212,9 @@ def set_device_state(entity_id, state, brightness=None, color_temp=None, rgb_col
 MEMORY_FILE = "/data/memory.json"
 
 def load_memory():
+    print(f"MEMORY_FILE sökväg: {MEMORY_FILE}", flush=True)
     if not os.path.exists(MEMORY_FILE):
+        print("Ingen minnesfil hittades", flush=True)
         return {}
     with open(MEMORY_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
