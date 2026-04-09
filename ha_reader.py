@@ -10,6 +10,9 @@ import threading
 import logging
 import sys
 from openai import OpenAI
+from datetime import datetime
+current_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 
 load_dotenv()
 
@@ -212,7 +215,7 @@ def set_device_state(entity_id, state, brightness=None, color_temp=None, rgb_col
 MEMORY_FILE = "/data/memory.json"
 
 def load_memory():
-    print(f"MEMORY_FILE sökväg: {MEMORY_FILE}", flush=True)
+    print(f"{current_time}--MEMORY_FILE sökväg: {MEMORY_FILE}", flush=True)
     if not os.path.exists(MEMORY_FILE):
         print("Ingen minnesfil hittades", flush=True)
         return {}
