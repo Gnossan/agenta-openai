@@ -351,11 +351,11 @@ if __name__ == "__main__":
     
     if in_container:
         # I HAOS — kör bara Flask
-        app.run(host="0.0.0.0", port=5002, debug=False)
+        app.run(host="0.0.0.0", port=5003, debug=False)
     else:
         # Lokalt — kör Flask i tråd + chattloop
         logging.getLogger('werkzeug').setLevel(logging.ERROR)
-        flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5002, use_reloader=False, use_debugger=False))
+        flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5003, use_reloader=False, use_debugger=False))
         flask_thread.daemon = True
         flask_thread.start()
         
