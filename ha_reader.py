@@ -280,6 +280,7 @@ def ask_ai(user_message, user_history=[]):
                 rgb_color = arguments.get("rgb_color", None)
                 result = set_device_state(arguments["entity_id"], arguments["state"], brightness, color_temp, rgb_color)
             elif tool_call.function.name == "save_memory":
+                print(f"save_memory anropat med key={arguments['key']}", flush=True)
                 result = save_memory(arguments["key"], arguments["value"])
             elif tool_call.function.name == "get_memory":
                 result = get_memory(arguments["key"])
