@@ -223,6 +223,9 @@ def load_memory():
         return json.load(f)
 
 def save_memory(key, value):
+    print(f"Försöker spara till: {MEMORY_FILE}", flush=True)
+    print(f"share finns: {os.path.exists('/share')}", flush=True)
+    print(f"share innehåll: {os.listdir('/share') if os.path.exists('/share') else 'saknas'}", flush=True)
     memory = load_memory()
     memory[key] = value
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
