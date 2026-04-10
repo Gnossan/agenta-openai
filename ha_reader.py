@@ -255,7 +255,8 @@ def ask_ai(user_message, user_history=[]):
                     "Använd verktygen för att utföra det användaren ber om. "
                     "Använd verktygen direkt utan att be om bekräftelse."
                     "Använd save_memory när användaren explicit ber dig komma ihåg något. "
-                    "Använd get_memory när användaren antyder att du borde känna till något."
+                    "Om användaren frågar om något du borde känna till, använd ALLTID get_memory för att kontrollera innan du svarar att du inte vet. "
+                    
                 )
             },
             *user_history,
