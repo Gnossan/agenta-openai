@@ -232,13 +232,16 @@ def save_memory(key, value):
         json.dump(memory, f, indent=2, ensure_ascii=False)
     return "ok"
 
-def get_memory(key):
+def get_memory(key, session_id="okänd"):
+    print(f"[{session_id}] get_memory anropat med key={key}", flush=True)
     memory = load_memory()
-    return memory.get(key, "ingen information hittades")
+    result = memory.get(key, "ingen information hittades")
+    print(f"[{session_id}] get_memory returnerar: {result}", flush=True)
+    return result
 # ─────────────────────────────────────────
 # AI-funktioner
 # ─────────────────────────────────────────
-def ask_ai(user_message, user_history=[]):
+def ask_ai(user_message, user_history=[], session_id="okänd"):
     devices = load_device_context()
     device_info = json.dumps(devices, ensure_ascii=False, indent=2)
 
@@ -281,7 +284,7 @@ def ask_ai(user_message, user_history=[]):
                 rgb_color = arguments.get("rgb_color", None)
                 result = set_device_state(arguments["entity_id"], arguments["state"], brightness, color_temp, rgb_color)
             elif tool_call.function.name == "save_memory":
-                print(f"save_memory anropat med key={arguments['key']}", flush=True)
+                print(f"[{session_id}] save_memory anropat med key={arguments['key']}", flush=True)
                 result = save_memory(arguments["key"], arguments["value"])
             elif tool_call.function.name == "get_memory":
                 result = get_memory(arguments["key"])
@@ -386,7 +389,7 @@ def chat():
             sessions[session_id] = []
         session_history = sessions[session_id]
         print("Anropar ask_ai...", flush=True)
-        answer = ask_ai(user_message, session_history)
+        answer = ask_ai(user_message, session_history, session_id)
         print(f"Svar från ask_ai: {answer}", flush=True)
         session_history.append({"role": "user", "content": user_message})
         session_history.append({"role": "assistant", "content": answer})
