@@ -39,8 +39,24 @@ HA_HEADERS = {
 }
 
 DEVICES_FILE = "devices.json"
+SESSIONS_FILE = "/data/sessions.json" if os.path.exists(OPTIONS_FILE) else "sessions.json"
 conversation_history = []
-sessions = {}
+
+
+def load_sessions():
+    try:
+        with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+
+def save_sessions(sessions_data):
+    with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
+        json.dump(sessions_data, f, ensure_ascii=False, indent=2)
+
+
+sessions = load_sessions()
 
 client = OpenAI()
 TOOLS = [
@@ -316,6 +332,7 @@ def chat():
         print(f"Svar från ask_ai: {answer}", flush=True)
         session_history.append({"role": "user", "content": user_message})
         session_history.append({"role": "assistant", "content": answer})
+        save_sessions(sessions)
         return {"reply": answer}
     except Exception as e:
       return {"reply": f"FELFEL: {str(e)}"}, 500
@@ -325,7 +342,6 @@ def chat():
 if __name__ == "__main__":
     save_device_context()
     conversation_history = []
-    sessions = {}
     
     in_container = os.path.exists("/data/options.json")
     

@@ -108,5 +108,5 @@ This project was built primarily as a learning exercise — to understand how AI
 - [ ] Session management (currently all users share the same conversation history)
 - [ ] Authentication on the `/chat` endpoint
 - [ ] Support for more device types (climate, sensors, media players)
-- [ ] Persistent conversation history across restarts
+- [x] Persistent conversation history across restarts
 - [ ] GitHub-based add-on repository (instead of manual Samba copy)
