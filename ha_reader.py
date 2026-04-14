@@ -10,9 +10,6 @@ import threading
 import logging
 import sys
 from openai import OpenAI
-from datetime import datetime
-current_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 
 load_dotenv()
 
@@ -21,7 +18,7 @@ app = Flask(__name__)
 # ─────────────────────────────────────────
 # Konfiguration
 # ─────────────────────────────────────────
-MODEL = os.getenv("MODEL", "gpt-5.4-mini")
+MODEL = os.getenv("MODEL", "gpt-4o-mini")
 OPTIONS_FILE = "/data/options.json"
 if os.path.exists(OPTIONS_FILE):
     with open(OPTIONS_FILE) as f:
@@ -30,6 +27,7 @@ if os.path.exists(OPTIONS_FILE):
     HA_URL = options.get("ha_url")
     HA_TOKEN = options.get("ha_token")
     os.environ["OPENAI_API_KEY"] = options.get("openai_api_key", "")
+    MODEL = options.get("model", "gpt-4o-mini")
 else:
     load_dotenv()
     SECRET = os.getenv("SECRET")
@@ -42,10 +40,12 @@ HA_HEADERS = {
 }
 
 DEVICES_FILE = "devices.json"
+MEMORY_FILE = "/share/memory.json"
 conversation_history = []
 sessions = {}
 
 client = OpenAI()
+
 TOOLS = [
     {
         "type": "function",
@@ -109,7 +109,7 @@ TOOLS = [
                 "properties": {
                     "key": {
                         "type": "string",
-                        "description": "En kort beskrivande nyckel, t.ex. 'sovrum_placering'"
+                        "description": "En kort beskrivande nyckel på engelska i snake_case, t.ex. 'dog_name' eller 'wake_time_weekdays'"
                     },
                     "value": {
                         "type": "string",
@@ -124,7 +124,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_memory",
-            "description": "Hämtar sparad information när användaren antyder att agenten borde känna till något.",
+            "description": "Hämtar sparad information när användaren antyder att agenten ska eller kan känna till något.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -138,6 +138,7 @@ TOOLS = [
         }
     }
 ]
+
 # Loggning
 logging.basicConfig(
     filename="ha_reader.log",
@@ -149,6 +150,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
     logging.error("Okantad krasch", exc_info=(exc_type, exc_value, exc_traceback))
 
 sys.excepthook = handle_exception
+
 # ─────────────────────────────────────────
 # HA-funktioner
 # ─────────────────────────────────────────
@@ -158,22 +160,17 @@ def get_device_context():
         headers=HA_HEADERS
     )
     all_states = r.json()
-
     devices = []
     for entity in all_states:
         entity_id = entity["entity_id"]
         domain = entity_id.split(".")[0]
-
-        # Bara lampor och brytare till en början
         if domain not in ["light", "switch"]:
             continue
-
         devices.append({
             "name": entity["attributes"].get("friendly_name", entity_id),
             "entity_id": entity_id,
             "last_changed": entity["last_changed"]
         })
-
     return devices
 
 def get_device_state(entity_id):
@@ -190,11 +187,10 @@ def save_device_context():
         json.dump(devices, f, indent=2, ensure_ascii=False)
     print(f"Sparade {len(devices)} enheter till {DEVICES_FILE}")
 
-
 def load_device_context():
     with open(DEVICES_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
-    
+
 def set_device_state(entity_id, state, brightness=None, color_temp=None, rgb_color=None):
     domain = entity_id.split(".")[0]
     service = "turn_on" if state == "on" else "turn_off"
@@ -212,38 +208,33 @@ def set_device_state(entity_id, state, brightness=None, color_temp=None, rgb_col
     )
     return "ok" if r.status_code == 200 else "fel"
 
-MEMORY_FILE = "/share/memory.json"
-
+# ─────────────────────────────────────────
+# Minnesfunktioner
+# ─────────────────────────────────────────
 def load_memory():
-    print(f"{current_time}--MEMORY_FILE sökväg: {MEMORY_FILE}", flush=True)
     if not os.path.exists(MEMORY_FILE):
-        print("Ingen minnesfil hittades", flush=True)
         return {}
     with open(MEMORY_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def save_memory(key, value):
-    print(f"Försöker spara till: {MEMORY_FILE}", flush=True)
-    print(f"share finns: {os.path.exists('/share')}", flush=True)
-    print(f"share innehåll: {os.listdir('/share') if os.path.exists('/share') else 'saknas'}", flush=True)
     memory = load_memory()
     memory[key] = value
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
         json.dump(memory, f, indent=2, ensure_ascii=False)
     return "ok"
 
-def get_memory(key, session_id="okänd"):
-    print(f"[{session_id}] get_memory anropat med key={key}", flush=True)
+def get_memory(key):
     memory = load_memory()
-    result = memory.get(key, "ingen information hittades")
-    print(f"[{session_id}] get_memory returnerar: {result}", flush=True)
-    return result
+    return memory.get(key, "ingen information hittades")
+
 # ─────────────────────────────────────────
 # AI-funktioner
 # ─────────────────────────────────────────
 def ask_ai(user_message, user_history=[], session_id="okänd"):
     devices = load_device_context()
     device_info = json.dumps(devices, ensure_ascii=False, indent=2)
+    memory_keys = list(load_memory().keys())
 
     response = client.chat.completions.create(
         model=MODEL,
@@ -253,13 +244,14 @@ def ask_ai(user_message, user_history=[], session_id="okänd"):
                 "content": (
                     "Du är en hemassistent som känner till följande enheter:\n\n"
                     f"{device_info}\n\n"
+                    f"Tillgängliga nycklar i minnet: {memory_keys}\n\n"
                     "Du kan hämta status och styra enheter i hemmet. "
                     "Du kan tända, släcka, dimma, ändra färgtemperatur och RGB-färg på lampor. "
                     "Använd verktygen för att utföra det användaren ber om. "
-                    "Använd verktygen direkt utan att be om bekräftelse."
+                    "Använd verktygen direkt utan att be om bekräftelse. "
                     "Använd save_memory när användaren explicit ber dig komma ihåg något. "
-                    "Om användaren frågar om något du borde känna till, använd ALLTID get_memory för att kontrollera innan du svarar att du inte vet. "
-                    
+                    "Använd snake_case på engelska för minnesnycklar, t.ex. 'dog_name'. "
+                    "Om användaren frågar om något du ska eller kan känna till, använd get_memory med relevant nyckel från listan ovan."
                 )
             },
             *user_history,
@@ -284,7 +276,6 @@ def ask_ai(user_message, user_history=[], session_id="okänd"):
                 rgb_color = arguments.get("rgb_color", None)
                 result = set_device_state(arguments["entity_id"], arguments["state"], brightness, color_temp, rgb_color)
             elif tool_call.function.name == "save_memory":
-                print(f"[{session_id}] save_memory anropat med key={arguments['key']}", flush=True)
                 result = save_memory(arguments["key"], arguments["value"])
             elif tool_call.function.name == "get_memory":
                 result = get_memory(arguments["key"])
@@ -313,23 +304,16 @@ def ask_ai(user_message, user_history=[], session_id="okänd"):
 # ─────────────────────────────────────────
 # Flask-routes
 # ─────────────────────────────────────────
-@app.route("/test")
-def test():
-    return {"status": "ok"}
 @app.route("/webhook", methods=["POST"])
 def webhook():
     token = request.headers.get("X-Webhook-Token")
     if token != SECRET:
         return "Unauthorized", 401
-
     data = request.get_json()
     user_message = data.get("message", "")
-    print(f"Fråga: {user_message}")
-
     answer = ask_ai(user_message)
-    print(f"Svar: {answer}")
-
     return answer, 200
+
 @app.route("/")
 def index():
     return """
@@ -341,7 +325,7 @@ def index():
     <title>Hemassistent</title>
     <style>
         body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 0 20px; }
-        #chat { border: 1px solid #ccc; height: 100px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
+        #chat { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
         .user { text-align: right; color: #0066cc; margin: 5px 0; }
         .ai { text-align: left; color: #333; margin: 5px 0; }
         input { width: 80%; padding: 8px; font-size: 16px; }
@@ -355,7 +339,6 @@ def index():
     <button onclick="send()">Skicka</button>
     <script>
         const sessionId = Math.random().toString(36).substring(2);
-        
         async function send() {
             const msg = document.getElementById("msg").value;
             if (!msg) return;
@@ -378,9 +361,9 @@ def index():
 </body>
 </html>
 """
+
 @app.route("/chat", methods=["POST"])
 def chat():
-    print("Chat route reached!", flush=True)
     data = request.get_json()
     user_message = data.get("message", "")
     session_id = data.get("session_id", "default")
@@ -388,14 +371,14 @@ def chat():
         if session_id not in sessions:
             sessions[session_id] = []
         session_history = sessions[session_id]
-        print("Anropar ask_ai...", flush=True)
         answer = ask_ai(user_message, session_history, session_id)
-        print(f"Svar från ask_ai: {answer}", flush=True)
         session_history.append({"role": "user", "content": user_message})
         session_history.append({"role": "assistant", "content": answer})
         return {"reply": answer}
     except Exception as e:
-      return {"reply": f"FELFEL: {str(e)}"}, 500
+        logging.error(f"Fel i chat: {e}", exc_info=True)
+        return {"reply": "Ett fel uppstod"}, 500
+
 # ─────────────────────────────────────────
 # Start
 # ─────────────────────────────────────────
@@ -403,19 +386,17 @@ if __name__ == "__main__":
     save_device_context()
     conversation_history = []
     sessions = {}
-    
+
     in_container = os.path.exists("/data/options.json")
-    
+
     if in_container:
-        # I HAOS — kör bara Flask
         app.run(host="0.0.0.0", port=5003, debug=False)
     else:
-        # Lokalt — kör Flask i tråd + chattloop
         logging.getLogger('werkzeug').setLevel(logging.ERROR)
         flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5003, use_reloader=False, use_debugger=False))
         flask_thread.daemon = True
         flask_thread.start()
-        
+
         while True:
             user_input = input("Du: ")
             if user_input.lower() in ["exit", "quit"]:
