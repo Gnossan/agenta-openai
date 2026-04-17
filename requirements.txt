@@ -2,3 +2,5 @@ flask
 requests
 openai
 python-dotenv
+qdrant-client
+websockets

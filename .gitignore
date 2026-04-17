@@ -6,3 +6,8 @@ test.txt
 devices.json
 Test_logg.txt
 ha_reader.log
+agenta-openai.code-workspace
+ha_websocket.py
+ha_websockets.py
+qdrant_cleanup.py
+qdrant_test.py

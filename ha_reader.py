@@ -3,12 +3,18 @@
 # ─────────────────────────────────────────
 from flask import Flask, request
 from dotenv import load_dotenv
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams, PointStruct
 import requests
 import json
 import os
 import threading
 import logging
 import sys
+import asyncio
+import websockets
+import uuid
+from datetime import datetime
 from openai import OpenAI
 
 load_dotenv()
@@ -18,7 +24,7 @@ app = Flask(__name__)
 # ─────────────────────────────────────────
 # Konfiguration
 # ─────────────────────────────────────────
-MODEL = os.getenv("MODEL", "gpt-4o-mini")
+MODEL = os.getenv("MODEL", "gpt-5.4-mini")
 OPTIONS_FILE = "/data/options.json"
 if os.path.exists(OPTIONS_FILE):
     with open(OPTIONS_FILE) as f:
@@ -27,7 +33,7 @@ if os.path.exists(OPTIONS_FILE):
     HA_URL = options.get("ha_url")
     HA_TOKEN = options.get("ha_token")
     os.environ["OPENAI_API_KEY"] = options.get("openai_api_key", "")
-    MODEL = options.get("model", "gpt-4o-mini")
+    MODEL = options.get("model", "gpt-5.4-mini")
 else:
     load_dotenv()
     SECRET = os.getenv("SECRET")
@@ -39,12 +45,21 @@ HA_HEADERS = {
     "Content-Type": "application/json",
 }
 
+WS_URL = HA_URL.replace("http://", "ws://") + "/api/websocket"
+
 DEVICES_FILE = "devices.json"
 MEMORY_FILE = "/share/memory.json"
 conversation_history = []
 sessions = {}
+previous_states = {}
 
 client = OpenAI()
+QDRANT_HOST = options.get("qdrant_host", "localhost") if os.path.exists(OPTIONS_FILE) else os.getenv("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(options.get("qdrant_port", 6333) if os.path.exists(OPTIONS_FILE) else os.getenv("QDRANT_PORT", 6333))
+
+qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+
+
 
 TOOLS = [
     {
@@ -134,6 +149,23 @@ TOOLS = [
                     }
                 },
                 "required": ["key"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_events",
+            "description": "Söker i hemhändelsehistoriken efter mönster och beteenden baserat på en fråga på naturligt språk.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "En fråga på naturligt språk, t.ex. 'vad händer på torsdagskvällar?' eller 'när brukar sovrumslampan tändas?'"
+                    }
+                },
+                "required": ["query"]
             }
         }
     }
@@ -228,6 +260,114 @@ def get_memory(key):
     memory = load_memory()
     return memory.get(key, "ingen information hittades")
 
+def search_events(query):
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=query
+    )
+    vector = response.data[0].embedding
+
+    resultat = qdrant.query_points(
+        collection_name="home_events",
+        query=vector,
+        limit=25
+    )
+
+    if not resultat.points:
+        return "Inga relevanta händelser hittades."
+
+    texter = [p.payload["text"] for p in resultat.points]
+    return "\n".join(texter)
+
+# ─────────────────────────────────────────
+# Qdrant-funktioner
+# ─────────────────────────────────────────
+def ensure_collection():
+    if not qdrant.collection_exists("home_events"):
+        qdrant.create_collection(
+            collection_name="home_events",
+            vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
+        )
+
+def log_event(entity_id, state):
+    now = datetime.now()
+    text = f"{now.strftime('%Y-%m-%d %A %H:%M')} — {entity_id} ändrades till {state}"
+
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=text
+    )
+    vector = response.data[0].embedding
+
+    qdrant.upsert(
+        collection_name="home_events",
+        points=[
+            PointStruct(
+                id=str(uuid.uuid4()),
+                vector=vector,
+                payload={
+                    "text": text,
+                    "entity_id": entity_id,
+                    "state": state,
+                    "timestamp": now.isoformat()
+                }
+            )
+        ]
+    )
+    #print(f"Loggad: {text}")
+
+# ─────────────────────────────────────────
+# WebSocket-lyssnare
+# ─────────────────────────────────────────
+async def listen():
+    async with websockets.connect(WS_URL) as ws:
+        msg = await ws.recv()
+        print("HA säger:", json.loads(msg)["type"])
+
+        await ws.send(json.dumps({
+            "type": "auth",
+            "access_token": HA_TOKEN
+        }))
+
+        msg = await ws.recv()
+        print("Auth:", json.loads(msg)["type"])
+
+        await ws.send(json.dumps({
+            "id": 1,
+            "type": "subscribe_events",
+            "event_type": "state_changed"
+        }))
+
+        msg = await ws.recv()
+        print("Prenumeration:", json.loads(msg)["type"])
+
+        print("Lyssnar på state-ändringar...")
+        while True:
+            msg = await ws.recv()
+            data = json.loads(msg)
+
+            if data.get("type") == "event":
+                entity_id = data["event"]["data"]["entity_id"]
+                new_state_obj = data["event"]["data"]["new_state"]
+                if new_state_obj is None:
+                    continue
+                new_state = new_state_obj["state"]
+                domain = entity_id.split(".")[0]
+
+                if domain == "sensor" and (
+                    "_power" in entity_id or
+                    "_total_energy" in entity_id
+                ):
+                    continue
+
+                if domain in ["light", "switch"]:
+                    if previous_states.get(entity_id) == new_state:
+                        continue
+                    previous_states[entity_id] = new_state
+
+                if domain in ["light", "switch", "sensor", "person", "device_tracker"]:
+                    log_event(entity_id, new_state)
+
 # ─────────────────────────────────────────
 # AI-funktioner
 # ─────────────────────────────────────────
@@ -279,6 +419,8 @@ def ask_ai(user_message, user_history=[], session_id="okänd"):
                 result = save_memory(arguments["key"], arguments["value"])
             elif tool_call.function.name == "get_memory":
                 result = get_memory(arguments["key"])
+            elif tool_call.function.name == "search_events":
+                result = search_events(arguments["query"])
             else:
                 result = "okänt verktyg"
 
@@ -344,7 +486,7 @@ def index():
             if (!msg) return;
             document.getElementById("chat").innerHTML += '<p class="user">' + msg + '</p>';
             document.getElementById("msg").value = "";
-            const base = window.location.pathname.replace(/\/$/, '');
+            const base = window.location.pathname.replace(/\\/$/, '');
             const res = await fetch(base + "/chat", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -384,8 +526,14 @@ def chat():
 # ─────────────────────────────────────────
 if __name__ == "__main__":
     save_device_context()
+    ensure_collection()
     conversation_history = []
     sessions = {}
+
+    # Starta WebSocket-lyssnaren i egen tråd
+    ws_thread = threading.Thread(target=lambda: asyncio.run(listen()))
+    ws_thread.daemon = True
+    ws_thread.start()
 
     in_container = os.path.exists("/data/options.json")
 
