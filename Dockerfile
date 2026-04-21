@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY ha_reader.py .
 COPY requirements.txt .
+COPY static/ static/
 
 RUN pip install -r requirements.txt
 RUN mkdir -p /data && echo '{"secret":"","ha_url":"","ha_token":"","openai_api_key":""}' > /data/options.json
