@@ -320,52 +320,59 @@ def log_event(entity_id, state):
 # WebSocket-lyssnare
 # ─────────────────────────────────────────
 async def listen():
-    async with websockets.connect(WS_URL) as ws:
-        msg = await ws.recv()
-        print("HA säger:", json.loads(msg)["type"])
+    while True:
+        try:
+            async with websockets.connect(WS_URL) as ws:
+                msg = await ws.recv()
+                print("HA säger:", json.loads(msg)["type"])
 
-        await ws.send(json.dumps({
-            "type": "auth",
-            "access_token": HA_TOKEN
-        }))
+                await ws.send(json.dumps({
+                    "type": "auth",
+                    "access_token": HA_TOKEN
+                }))
 
-        msg = await ws.recv()
-        print("Auth:", json.loads(msg)["type"])
+                msg = await ws.recv()
+                print("Auth:", json.loads(msg)["type"])
 
-        await ws.send(json.dumps({
-            "id": 1,
-            "type": "subscribe_events",
-            "event_type": "state_changed"
-        }))
+                await ws.send(json.dumps({
+                    "id": 1,
+                    "type": "subscribe_events",
+                    "event_type": "state_changed"
+                }))
 
-        msg = await ws.recv()
-        print("Prenumeration:", json.loads(msg)["type"])
+                msg = await ws.recv()
+                print("Prenumeration:", json.loads(msg)["type"])
 
-        print("Lyssnar på state-ändringar...")
-        while True:
-            msg = await ws.recv()
-            data = json.loads(msg)
+                print("Lyssnar på state-ändringar...")
+                while True:
+                    msg = await ws.recv()
+                    data = json.loads(msg)
 
-            if data.get("type") == "event":
-                entity_id = data["event"]["data"]["entity_id"]
-                new_state_obj = data["event"]["data"]["new_state"]
-                if new_state_obj is None:
-                    continue
-                new_state = new_state_obj["state"]
-                domain = entity_id.split(".")[0]
+                    if data.get("type") == "event":
+                        entity_id = data["event"]["data"]["entity_id"]
+                        new_state_obj = data["event"]["data"]["new_state"]
+                        if new_state_obj is None:
+                            continue
+                        new_state = new_state_obj["state"]
+                        domain = entity_id.split(".")[0]
 
-                if domain == "sensor" and (
-                    "_power" in entity_id or
-                    "_total_energy" in entity_id
-                ):
-                    continue
+                        if domain == "sensor" and (
+                            "_power" in entity_id or
+                            "_total_energy" in entity_id
+                        ):
+                            continue
 
-                if domain in ["light", "switch"]:
-                    if previous_states.get(entity_id) == new_state:
-                        continue
-                    previous_states[entity_id] = new_state
+                        if domain in ["light", "switch"]:
+                            if previous_states.get(entity_id) == new_state:
+                                continue
+                            previous_states[entity_id] = new_state
 
-                if domain in ["light", "switch", "sensor", "person", "device_tracker"]:
+                        if domain in ["light", "switch", "sensor", "person", "device_tracker"]:
+                            log_event(entity_id, new_state)
+
+        except Exception as e:
+            print(f"WebSocket fel, återansluter om 5s: {e}", flush=True)
+            await asyncio.sleep(5)nsor", "person", "device_tracker"]:
                     log_event(entity_id, new_state)
 
 # ─────────────────────────────────────────
