@@ -1,7 +1,7 @@
 {
 
   "name": "Home AI-OpenAI",
-  "version": "0.5.41",
+  "version": "0.5.42",
 
   "slug": "homeai-openai",
   "description": "AI-assisterad hemautomation",
@@ -31,9 +31,9 @@
     "qdrant_port": "int"
   },
   "ports": {
-    "5003/tcp": 5001
+    "5001/tcp": 5001
   },
   "ports_description": {
-    "5003/tcp": "Web interface"
+    "5001/tcp": "Web interface"
   }
 }
