@@ -769,7 +769,7 @@ def manifest():
 @app.route("/debug")
 def debug():
     import os
-    return str(os.listdir("/app"))
+    return str(os.listdir("/app/static"))
 # ─────────────────────────────────────────
 # Start
 # ─────────────────────────────────────────
