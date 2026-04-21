@@ -770,6 +770,9 @@ def manifest():
 def debug():
     import os
     return str(os.listdir("/app/static"))
+@app.route("/icon.png")
+def icon():
+    return app.send_static_file("icon.png")
 # ─────────────────────────────────────────
 # Start
 # ─────────────────────────────────────────
