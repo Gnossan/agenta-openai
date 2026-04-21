@@ -767,7 +767,7 @@ if __name__ == "__main__":
     try:
         save_device_context()
     except Exception as e:
-        print(f"kunde inte spara enheter:{e}", flush=True    
+        print(f"kunde inte spara enheter:{e}"), flush=True    
         ensure_collection()
         conversation_history = []
         sessions = {}
