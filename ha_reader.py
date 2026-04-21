@@ -19,7 +19,7 @@ from openai import OpenAI
 
 load_dotenv()
 
-aapp = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='static')
 
 # ─────────────────────────────────────────
 # Konfiguration
