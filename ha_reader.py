@@ -764,10 +764,13 @@ def manifest():
 # Start
 # ─────────────────────────────────────────
 if __name__ == "__main__":
-    save_device_context()
-    ensure_collection()
-    conversation_history = []
-    sessions = {}
+    try:
+        save_device_context()
+    except Exception as e:
+        print/f"kunde inte spara enheter:{e}", flush=True    
+        ensure_collection()
+        conversation_history = []
+        sessions = {}
 
     # Starta WebSocket-lyssnaren i egen tråd
     ws_thread = threading.Thread(target=lambda: asyncio.run(listen()))
