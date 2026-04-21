@@ -372,8 +372,7 @@ async def listen():
 
         except Exception as e:
             print(f"WebSocket fel, återansluter om 5s: {e}", flush=True)
-            await asyncio.sleep(5)nsor", "person", "device_tracker"]:
-                    log_event(entity_id, new_state)
+            await asyncio.sleep(5)
 
 # ─────────────────────────────────────────
 # AI-funktioner
