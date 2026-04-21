@@ -19,7 +19,7 @@ from openai import OpenAI
 
 load_dotenv()
 
-app = Flask(__name__)
+aapp = Flask(__name__, static_folder='static')
 
 # ─────────────────────────────────────────
 # Konfiguration
@@ -780,7 +780,7 @@ if __name__ == "__main__":
         app.run(host="0.0.0.0", port=5002, debug=False)
     else:
         logging.getLogger('werkzeug').setLevel(logging.ERROR)
-        flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5003, use_reloader=False, use_debugger=False))
+        flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5002, use_reloader=False, use_debugger=False))
         flask_thread.daemon = True
         flask_thread.start()
 
