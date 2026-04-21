@@ -1,7 +1,7 @@
 {
 
-  "name": "Home AI-OpenAI-dev",
-  "version": "0.5.1",
+  "name": "Home AI-OpenAI",
+  "version": "0.5.2",
 
   "slug": "homeai-openai",
   "description": "AI-assisterad hemautomation",

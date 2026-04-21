@@ -463,46 +463,264 @@ def index():
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <title>Hemassistent</title>
     <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 0 20px; }
-        #chat { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
-        .user { text-align: right; color: #0066cc; margin: 5px 0; }
-        .ai { text-align: left; color: #333; margin: 5px 0; }
-        input { width: 80%; padding: 8px; font-size: 16px; }
-        button { width: 18%; padding: 8px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f0f0f5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #fff;
+            border-bottom: 0.5px solid rgba(0,0,0,0.12);
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .header-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #185FA5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #E6F1FB;
+            font-size: 13px;
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+
+        .header-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #000;
+        }
+
+        .header-subtitle {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #f0f0f5;
+        }
+
+        .bubble-row {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bubble-row.user { align-items: flex-end; }
+        .bubble-row.ai { align-items: flex-start; }
+
+        .bubble {
+            max-width: 78%;
+            padding: 9px 13px;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .bubble.user {
+            background: #185FA5;
+            color: #fff;
+            border-radius: 18px 18px 4px 18px;
+        }
+
+        .bubble.ai {
+            background: #fff;
+            color: #000;
+            border-radius: 18px 18px 18px 4px;
+            border: 0.5px solid rgba(0,0,0,0.1);
+        }
+
+        .timestamp {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 3px;
+            padding: 0 4px;
+        }
+
+        .typing {
+            display: flex;
+            gap: 4px;
+            padding: 10px 14px;
+            background: #fff;
+            border: 0.5px solid rgba(0,0,0,0.1);
+            border-radius: 18px 18px 18px 4px;
+            width: fit-content;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #aaa;
+            animation: bounce 1.2s infinite;
+        }
+
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-5px); }
+        }
+
+        .input-area {
+            background: #fff;
+            border-top: 0.5px solid rgba(0,0,0,0.12);
+            padding: 10px 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .msg-input {
+            flex: 1;
+            border: 0.5px solid rgba(0,0,0,0.2);
+            border-radius: 20px;
+            padding: 9px 14px;
+            font-size: 15px;
+            background: #f0f0f5;
+            color: #000;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .msg-input:focus {
+            border-color: #185FA5;
+        }
+
+        .send-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #185FA5;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .send-btn:active { transform: scale(0.93); }
+
+        @media (prefers-color-scheme: dark) {
+            body { background: #1c1c1e; }
+            .header { background: #2c2c2e; border-color: rgba(255,255,255,0.1); }
+            .header-title { color: #fff; }
+            .header-subtitle { color: #888; }
+            .chat-area { background: #1c1c1e; }
+            .bubble.ai { background: #2c2c2e; color: #fff; border-color: rgba(255,255,255,0.08); }
+            .input-area { background: #2c2c2e; border-color: rgba(255,255,255,0.1); }
+            .msg-input { background: #1c1c1e; color: #fff; border-color: rgba(255,255,255,0.2); }
+            .timestamp { color: #666; }
+        }
     </style>
 </head>
 <body>
-    <h2>Hemassistent - OpenAI</h2>
-    <div id="chat"></div>
-    <input type="text" id="msg" placeholder="Skriv något..." />
-    <button onclick="send()">Skicka</button>
+    <div class="header">
+        <div class="header-avatar">AI</div>
+        <div>
+            <div class="header-title">Hemassistent</div>
+            <div class="header-subtitle">Online</div>
+        </div>
+    </div>
+
+    <div class="chat-area" id="chat"></div>
+
+    <div class="input-area">
+        <input class="msg-input" id="msg" placeholder="Skriv något..." autocomplete="off" />
+        <button class="send-btn" onclick="send()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+        </button>
+    </div>
+
     <script>
         const sessionId = Math.random().toString(36).substring(2);
-        async function send() {
-            const msg = document.getElementById("msg").value;
-            if (!msg) return;
-            document.getElementById("chat").innerHTML += '<p class="user">' + msg + '</p>';
-            document.getElementById("msg").value = "";
-            const base = window.location.pathname.replace(/\\/$/, '');
-            const res = await fetch(base + "/chat", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({message: msg, session_id: sessionId})
-            });
-            const data = await res.json();
-            document.getElementById("chat").innerHTML += '<p class="ai">' + data.reply + '</p>';
-            document.getElementById("chat").scrollTop = document.getElementById("chat").scrollHeight;
+
+        function now() {
+            return new Date().toLocaleTimeString('sv-SE', {hour: '2-digit', minute: '2-digit'});
         }
-        document.getElementById("msg").addEventListener("keypress", function(e) {
-            if (e.key === "Enter") send();
+
+        function addBubble(text, role) {
+            const chat = document.getElementById('chat');
+            const row = document.createElement('div');
+            row.className = 'bubble-row ' + role;
+            row.innerHTML = '<div class="bubble ' + role + '">' + text + '</div><div class="timestamp">' + now() + '</div>';
+            chat.appendChild(row);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function addTyping() {
+            const chat = document.getElementById('chat');
+            const row = document.createElement('div');
+            row.className = 'bubble-row ai';
+            row.id = 'typing';
+            row.innerHTML = '<div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+            chat.appendChild(row);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function removeTyping() {
+            const t = document.getElementById('typing');
+            if (t) t.remove();
+        }
+
+        async function send() {
+            const input = document.getElementById('msg');
+            const msg = input.value.trim();
+            if (!msg) return;
+            input.value = '';
+            addBubble(msg, 'user');
+            addTyping();
+            const base = window.location.pathname.replace(/\\/$/, '');
+            try {
+                const res = await fetch(base + '/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: msg, session_id: sessionId})
+                });
+                const data = await res.json();
+                removeTyping();
+                addBubble(data.reply, 'ai');
+            } catch (e) {
+                removeTyping();
+                addBubble('Något gick fel. Försök igen.', 'ai');
+            }
+        }
+
+        document.getElementById('msg').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') send();
         });
     </script>
 </body>
 </html>
 """
+
 
 @app.route("/chat", methods=["POST"])
 def chat():
