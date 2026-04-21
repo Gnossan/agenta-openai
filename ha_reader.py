@@ -767,10 +767,15 @@ if __name__ == "__main__":
     try:
         save_device_context()
     except Exception as e:
-        print(f"kunde inte spara enheter:{e}", flush=True)    
+        print(f"Kunde inte spara enheter: {e}", flush=True)
+    
+    try:
         ensure_collection()
-        conversation_history = []
-        sessions = {}
+    except Exception as e:
+        print(f"Kunde inte skapa Qdrant-samling: {e}", flush=True)
+    
+    conversation_history = []
+    sessions = {}
 
     # Starta WebSocket-lyssnaren i egen tråd
     ws_thread = threading.Thread(target=lambda: asyncio.run(listen()))
