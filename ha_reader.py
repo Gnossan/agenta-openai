@@ -465,6 +465,10 @@ def index():
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <title>Hemassistent</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Hemassistent">
+    <link rel="manifest" href="/manifest.json">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -739,6 +743,23 @@ def chat():
         logging.error(f"Fel i chat: {e}", exc_info=True)
         return {"reply": "Ett fel uppstod"}, 500
 
+@app.route("/manifest.json")
+def manifest():
+    return {
+        "name": "Hemassistent",
+        "short_name": "Hemassistent",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#f0f0f5",
+        "theme_color": "#185FA5",
+        "icons": [
+            {
+                "src": "/icon.png",
+                "sizes": "192x192",
+                "type": "image/png"
+            }
+        ]
+    }
 # ─────────────────────────────────────────
 # Start
 # ─────────────────────────────────────────
