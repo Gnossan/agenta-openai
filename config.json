@@ -1,7 +1,7 @@
 {
 
   "name": "Home AI-OpenAI",
-  "version": "0.5.4",
+  "version": "0.5.41",
 
   "slug": "homeai-openai",
   "description": "AI-assisterad hemautomation",
@@ -9,7 +9,7 @@
   "startup": "application",
   "boot": "auto",
   "ingress": true,
-  "ingress_port": 5002,
+  "ingress_port": 5001,
   "ingress_entry": "/",
   "panel_icon": "mdi:home-assistant",
   "panel_title": "Home AI",
@@ -31,7 +31,7 @@
     "qdrant_port": "int"
   },
   "ports": {
-    "5003/tcp": 5002
+    "5003/tcp": 5001
   },
   "ports_description": {
     "5003/tcp": "Web interface"
