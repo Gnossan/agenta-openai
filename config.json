@@ -1,32 +1,39 @@
 {
-  "name": "Home AI - OpenAI",
-  "version": "0.3.63",
+
+  "name": "Home AI-OpenAI-dev",
+  "version": "0.5.0",
+
   "slug": "homeai-openai",
   "description": "AI-assisterad hemautomation",
   "arch": ["aarch64", "amd64", "armv7"],
   "startup": "application",
   "boot": "auto",
   "ingress": true,
-  "ingress_port": 5002,
+  "ingress_port": 5003,
   "ingress_entry": "/",
   "panel_icon": "mdi:home-assistant",
   "panel_title": "Home AI",
+  "map": ["share:rw"],
   "options": {
     "secret": "",
     "ha_url": "",
     "ha_token": "",
-    "openai_api_key": ""
+    "openai_api_key": "",
+    "qdrant_host": "",
+    "qdrant_port": 6333
   },
   "schema": {
     "secret": "str",
     "ha_url": "str",
     "ha_token": "str",
-    "openai_api_key": "str"
+    "openai_api_key": "str",
+    "qdrant_host": "str",
+    "qdrant_port": "int"
   },
   "ports": {
-    "5002/tcp": 5002
+    "5003/tcp": 5003
   },
   "ports_description": {
-    "5002/tcp": "Web interface"
+    "5003/tcp": "Web interface"
   }
 }
