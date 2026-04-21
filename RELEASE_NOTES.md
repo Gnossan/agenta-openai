@@ -1,5 +1,6 @@
 # Release Notes
-
+## v0.5.1 — Change of port to 5002
+*2026-04-21*
 ## v0.5.0 — Vector Database & Event History
 *2026-04-21*
 

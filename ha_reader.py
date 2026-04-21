@@ -538,7 +538,7 @@ if __name__ == "__main__":
     in_container = os.path.exists("/data/options.json")
 
     if in_container:
-        app.run(host="0.0.0.0", port=5003, debug=False)
+        app.run(host="0.0.0.0", port=5002, debug=False)
     else:
         logging.getLogger('werkzeug').setLevel(logging.ERROR)
         flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5003, use_reloader=False, use_debugger=False))
