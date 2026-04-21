@@ -766,6 +766,10 @@ def manifest():
             }
         ]
     }
+@app.route("/debug")
+def debug():
+    import os
+    return str(os.listdir("/app"))
 # ─────────────────────────────────────────
 # Start
 # ─────────────────────────────────────────
