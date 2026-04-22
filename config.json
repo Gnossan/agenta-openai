@@ -1,11 +1,13 @@
 {
-
   "name": "Home AI-OpenAI",
-  "version": "0.5.5",
-
+  "version": "0.5.51",
   "slug": "homeai-openai",
   "description": "AI-assisterad hemautomation",
-  "arch": ["aarch64", "amd64", "armv7"],
+  "arch": [
+    "aarch64",
+    "amd64",
+    "armv7"
+  ],
   "startup": "application",
   "boot": "auto",
   "ingress": true,
@@ -13,7 +15,9 @@
   "ingress_entry": "/",
   "panel_icon": "mdi:home-assistant",
   "panel_title": "Home AI",
-  "map": ["share:rw"],
+  "map": [
+    "share:rw"
+  ],
   "options": {
     "secret": "",
     "ha_url": "",
