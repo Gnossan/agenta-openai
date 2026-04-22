@@ -54,8 +54,12 @@ sessions = {}
 previous_states = {}
 
 client = OpenAI()
-QDRANT_HOST = options.get("qdrant_host", "localhost") if os.path.exists(OPTIONS_FILE) else os.getenv("QDRANT_HOST", "localhost")
-QDRANT_PORT = int(options.get("qdrant_port", 6333) if os.path.exists(OPTIONS_FILE) else os.getenv("QDRANT_PORT", 6333))
+if os.path.exists(OPTIONS_FILE):
+    QDRANT_HOST = options.get("qdrant_host", "localhost")
+    QDRANT_PORT = int(options.get("qdrant_port", 6333))
+else:
+    QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+    QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 
 qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
@@ -377,7 +381,8 @@ async def listen():
 # ─────────────────────────────────────────
 # AI-funktioner
 # ─────────────────────────────────────────
-def ask_ai(user_message, user_history=[], session_id="okänd"):
+def ask_ai(user_message, user_history=None, session_id="okänd"):
+    user_history = user_history or []
     devices = load_device_context()
     device_info = json.dumps(devices, ensure_ascii=False, indent=2)
     memory_keys = list(load_memory().keys())
@@ -439,6 +444,21 @@ def ask_ai(user_message, user_history=[], session_id="okänd"):
         second_response = client.chat.completions.create(
             model=MODEL,
             messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Du är en hemassistent som känner till följande enheter:\n\n"
+                        f"{device_info}\n\n"
+                        f"Tillgängliga nycklar i minnet: {memory_keys}\n\n"
+                        "Du kan hämta status och styra enheter i hemmet. "
+                        "Du kan tända, släcka, dimma, ändra färgtemperatur och RGB-färg på lampor. "
+                        "Använd verktygen för att utföra det användaren ber om. "
+                        "Använd verktygen direkt utan att be om bekräftelse. "
+                        "Använd save_memory när användaren explicit ber dig komma ihåg något. "
+                        "Använd snake_case på engelska för minnesnycklar, t.ex. 'dog_name'. "
+                        "Om användaren frågar om något du ska eller kan känna till, använd get_memory med relevant nyckel från listan ovan."
+                    )
+                },
                 *user_history,
                 {"role": "user", "content": user_message},
                 message,
@@ -680,7 +700,14 @@ def index():
             const chat = document.getElementById('chat');
             const row = document.createElement('div');
             row.className = 'bubble-row ' + role;
-            row.innerHTML = '<div class="bubble ' + role + '">' + text + '</div><div class="timestamp">' + now() + '</div>';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble ' + role;
+            bubble.textContent = text;
+            const timestamp = document.createElement('div');
+            timestamp.className = 'timestamp';
+            timestamp.textContent = now();
+            row.appendChild(bubble);
+            row.appendChild(timestamp);
             chat.appendChild(row);
             chat.scrollTop = chat.scrollHeight;
         }
@@ -744,6 +771,7 @@ def chat():
         answer = ask_ai(user_message, session_history, session_id)
         session_history.append({"role": "user", "content": user_message})
         session_history.append({"role": "assistant", "content": answer})
+        sessions[session_id] = session_history[-20:]
         return {"reply": answer}
     except Exception as e:
         logging.error(f"Fel i chat: {e}", exc_info=True)
