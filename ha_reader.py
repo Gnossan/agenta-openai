@@ -385,33 +385,33 @@ def ask_ai(user_message, user_history=None, session_id="okänd"):
     user_history = user_history or []
     devices = load_device_context()
     device_info = json.dumps(devices, ensure_ascii=False, indent=2)
-    mmemory_keys = list(load_memory().keys())
+    memory_keys = list(load_memory().keys())
 
-    system_prompt = {
-        "role": "system",
-        "content": (
-            "Du är en hemassistent som känner till följande enheter:\n\n"
-            f"{device_info}\n\n"
-            f"Tillgängliga nycklar i minnet: {memory_keys}\n\n"
-            "Du kan hämta status och styra enheter i hemmet. "
-            "Du kan tända, släcka, dimma, ändra färgtemperatur och RGB-färg på lampor. "
-            "Använd verktygen för att utföra det användaren ber om. "
-            "Använd verktygen direkt utan att be om bekräftelse. "
-            "Använd save_memory när användaren explicit ber dig komma ihåg något. "
-            "Använd snake_case på engelska för minnesnycklar, t.ex. 'dog_name'. "
-            "Om användaren frågar om något du ska eller kan känna till, använd get_memory med relevant nyckel från listan ovan."
-        )
-    }
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
-            system_prompt,
+            {
+                "role": "system",
+                "content": (
+                    "Du är en hemassistent som känner till följande enheter:\n\n"
+                    f"{device_info}\n\n"
+                    f"Tillgängliga nycklar i minnet: {memory_keys}\n\n"
+                    "Du kan hämta status och styra enheter i hemmet. "
+                    "Du kan tända, släcka, dimma, ändra färgtemperatur och RGB-färg på lampor. "
+                    "Använd verktygen för att utföra det användaren ber om. "
+                    "Använd verktygen direkt utan att be om bekräftelse. "
+                    "Använd save_memory när användaren explicit ber dig komma ihåg något. "
+                    "Använd snake_case på engelska för minnesnycklar, t.ex. 'dog_name'. "
+                    "Om användaren frågar om något du ska eller kan känna till, använd get_memory med relevant nyckel från listan ovan."
+                )
+            },
             *user_history,
             {"role": "user", "content": user_message}
         ],
         tools=TOOLS,
         temperature=0.5
     )
+
     message = response.choices[0].message
 
     if message.tool_calls:
@@ -444,11 +444,26 @@ def ask_ai(user_message, user_history=None, session_id="okänd"):
         second_response = client.chat.completions.create(
             model=MODEL,
             messages=[
-            system_prompt,
-            *user_history,
-            {"role": "user", "content": user_message}
-        ],
-           
+                {
+                    "role": "system",
+                    "content": (
+                        "Du är en hemassistent som känner till följande enheter:\n\n"
+                        f"{device_info}\n\n"
+                        f"Tillgängliga nycklar i minnet: {memory_keys}\n\n"
+                        "Du kan hämta status och styra enheter i hemmet. "
+                        "Du kan tända, släcka, dimma, ändra färgtemperatur och RGB-färg på lampor. "
+                        "Använd verktygen för att utföra det användaren ber om. "
+                        "Använd verktygen direkt utan att be om bekräftelse. "
+                        "Använd save_memory när användaren explicit ber dig komma ihåg något. "
+                        "Använd snake_case på engelska för minnesnycklar, t.ex. 'dog_name'. "
+                        "Om användaren frågar om något du ska eller kan känna till, använd get_memory med relevant nyckel från listan ovan."
+                    )
+                },
+                *user_history,
+                {"role": "user", "content": user_message},
+                message,
+                *tool_results
+            ]
         )
         return second_response.choices[0].message.content.strip()
 
